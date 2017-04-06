@@ -5,7 +5,7 @@
 
 require 'msf/core'
 
-class Metasploit3 < Msf::Auxiliary
+class MetasploitModule < Msf::Auxiliary
 
   include Msf::Exploit::Remote::HttpServer
 
@@ -16,6 +16,9 @@ class Metasploit3 < Msf::Auxiliary
         This module allows you to open an android meterpreter via a browser. An Android
         meterpreter must be installed as an application beforehand on the target device
         in order to use this.
+
+        For best results, you can consider using the auxiliary/client/sms/send_text to
+        trick your target into opening the malicious link, and wake up Meterpreter.
       },
       'License'        => MSF_LICENSE,
       'Author'         => [ 'sinn3r' ],

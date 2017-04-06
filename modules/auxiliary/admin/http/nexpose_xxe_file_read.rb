@@ -4,9 +4,9 @@
 ##
 
 require 'msf/core'
-require 'rapid7/nexpose'
+require 'nexpose'
 
-class Metasploit4 < Msf::Auxiliary
+class MetasploitModule < Msf::Auxiliary
 
   include Msf::Exploit::Remote::HttpClient
   include Msf::Auxiliary::Report
@@ -74,9 +74,10 @@ class Metasploit4 < Msf::Auxiliary
   def run
     user = datastore['USERNAME']
     pass = datastore['PASSWORD']
+    trust_store = datastore['TRUST_STORE']
     prot = ssl ? 'https' : 'http'
 
-    nsc = Nexpose::Connection.new(rhost, user, pass, rport)
+    nsc = Nexpose::Connection.new(rhost, user, pass, rport, nil, nil, trust_store)
 
     print_status("Authenticating as: " << user)
     begin
@@ -140,7 +141,7 @@ class Metasploit4 < Msf::Auxiliary
 
     print_status("Cleaning up")
     begin
-      nsc.site_delete id
+      nsc.delete_site id
     rescue
       print_warning("Error while cleaning up site ID, manual cleanup required!")
     end

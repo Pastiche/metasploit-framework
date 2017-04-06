@@ -6,7 +6,7 @@
 require 'msf/core'
 require 'rex'
 
-class Metasploit3 < Msf::Post
+class MetasploitModule < Msf::Post
 
   def initialize(info={})
     super( update_info( info,
@@ -42,7 +42,7 @@ class Metasploit3 < Msf::Post
     if datastore['SPAWN']
       print_status("Spawning notepad.exe process to migrate to")
       target_pid = create_temp_proc
-    elsif datastore['PID'] != 0
+    elsif datastore['PID']
       target_pid = datastore['PID']
     elsif datastore['NAME']
       target_pid = session.sys.process[datastore['NAME']]

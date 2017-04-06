@@ -10,7 +10,7 @@
 
 require 'msf/core'
 
-class Metasploit3 < Msf::Auxiliary
+class MetasploitModule < Msf::Auxiliary
 
   include Msf::Exploit::Remote::Smtp
   include Msf::Auxiliary::Fuzzer
@@ -30,7 +30,7 @@ class Metasploit3 < Msf::Auxiliary
 
     register_options([
       Opt::RPORT(25),
-      OptInt.new("STARTLEN", [true, "Lenght of the string - start number", 100] ),
+      OptInt.new("STARTLEN", [true, "Length of the string - start number", 100] ),
       OptInt.new("INTERACTIONS", [false, "Number of interactions to run", 100] ),
       OptBool.new("RESPECTORDER", [false, "Respect order of commands", true] ),
       OptEnum.new("CMD", [true,"Command to fuzzer",'EHLO',

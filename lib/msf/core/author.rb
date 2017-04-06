@@ -25,7 +25,7 @@ class Msf::Author
     'egypt'               => 'egypt' + 0x40.chr + 'metasploit.com',
     'et'                  => 'et' + 0x40.chr + 'metasploit.com',
     'Christian Mehlmauer' => 'FireFart' + 0x40.chr + 'gmail.com',
-    'hdm'                 => 'hdm' + 0x40.chr + 'metasploit.com',
+    'hdm'                 => 'x' + 0x40.chr + 'hdm.io',
     'I)ruid'              => 'druid' +  0x40.chr + 'caughq.org',
     'jcran'               => 'jcran' + 0x40.chr + 'metasploit.com',
     'jduck'               => 'jduck' + 0x40.chr + 'metasploit.com',
@@ -51,7 +51,8 @@ class Msf::Author
     'theLightCosine'      => 'theLightCosine' + 0x40.chr + 'metasploit.com',
     'todb'                => 'todb' + 0x40.chr + 'metasploit.com',
     'vlad902'             => 'vlad902' + 0x40.chr + 'gmail.com',
-    'wvu'                 => 'wvu' + 0x40.chr + 'metasploit.com'
+    'wvu'                 => 'wvu' + 0x40.chr + 'metasploit.com',
+    'zeroSteiner'         => 'zeroSteiner' + 0x40.chr + 'gmail.com'
   }
 
   #

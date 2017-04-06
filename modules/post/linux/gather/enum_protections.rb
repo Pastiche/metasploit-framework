@@ -5,7 +5,7 @@
 
 require 'msf/core'
 
-class Metasploit3 < Msf::Post
+class MetasploitModule < Msf::Post
 
   include Msf::Post::File
   include Msf::Post::Linux::System
@@ -71,7 +71,8 @@ class Metasploit3 < Msf::Post
       "truecrypt", "bulldog", "ufw", "iptables", "logrotate", "logwatch",
       "chkrootkit", "clamav", "snort", "tiger", "firestarter", "avast", "lynis",
       "rkhunter", "tcpdump", "webmin", "jailkit", "pwgen", "proxychains", "bastille",
-      "psad", "wireshark", "nagios", "nagios", "apparmor", "honeyd", "thpot"
+      "psad", "wireshark", "nagios", "nagios", "apparmor", "honeyd", "thpot",
+      "aa-status", "gradm2", "getenforce"
     ]
 
     env_paths = cmd_exec("echo $PATH").split(":")

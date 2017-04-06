@@ -3,11 +3,12 @@ source 'https://rubygems.org'
 #   spec.add_runtime_dependency '<name>', [<version requirements>]
 gemspec name: 'metasploit-framework'
 
+gem 'bit-struct', git: 'https://github.com/busterb/bit-struct', branch: 'ruby-2.4'
+gem 'method_source', git: 'https://github.com/banister/method_source', branch: 'master'
+
 # separate from test as simplecov is not run on travis-ci
 group :coverage do
   # code coverage for tests
-  # any version newer than 0.5.4 gives an Encoding error when trying to read the source files.
-  # see: https://github.com/colszowka/simplecov/issues/127 (hopefully fixed in 0.8.0)
   gem 'simplecov'
 end
 
@@ -17,21 +18,26 @@ group :development do
   # generating documentation
   gem 'yard'
   # for development and testing purposes
-  gem 'pry'
+  gem 'pry', git: 'https://github.com/pry/pry', branch: 'master'
+  # module documentation
+  gem 'octokit', git: 'https://github.com/octokit/octokit.rb', branch: 'master'
+  # session aggregator, native builds have issues on arm platforms for now
+  gem 'metasploit-aggregator' if [
+    'x86-mingw32', 'x64-mingw32',
+    'x86_64-linux', 'x86-linux',
+    'darwin'].include?(RUBY_PLATFORM.gsub(/.*darwin.*/, 'darwin'))
 end
 
 group :development, :test do
   # automatically include factories from spec/factories
-  gem 'factory_girl_rails', '~> 4.5.0'
+  gem 'factory_girl_rails'
   # Make rspec output shorter and more useful
-  gem 'fivemat', '1.2.1'
+  gem 'fivemat'
   # running documentation generation tasks and rspec tasks
-  gem 'rake', '>= 10.0.0'
-  # testing framework
-  gem 'rspec', '>= 2.12', '< 3.0.0'
+  gem 'rake'
   # Define `rake spec`.  Must be in development AND test so that its available by default as a rake test when the
   # environment is development
-  gem 'rspec-rails' , '>= 2.12', '< 3.0.0'
+  gem 'rspec-rails'
 end
 
 group :test do

