@@ -1,4 +1,3 @@
-require 'ostruct'
 require 'digest'
 
 #
@@ -20,28 +19,10 @@ module ResponseDataHelper
           return JSON.parse(body).symbolize_keys
         end
       end
-    rescue Exception => e
+    rescue => e
       elog "Error parsing response: #{e.message}"
       e.backtrace.each { |line| elog line }
     end
-  end
-
-  #
-  # Converts an HTTP response to an OpenStruct object
-  #
-  def json_to_open_struct_object(response_wrapper, returns_on_error = nil)
-    if response_wrapper.expected
-      begin
-        body = response_wrapper.response.body
-        if !body.nil? && !body.empty?
-          return JSON.parse(body, object_class: OpenStruct)
-        end
-      rescue Exception => e
-        elog "open struct conversion failed #{e.message}"
-      end
-    end
-
-    return returns_on_error
   end
 
   #
@@ -64,7 +45,7 @@ module ResponseDataHelper
           end
           return rv
         end
-      rescue Exception => e
+      rescue => e
         elog "Mdm Object conversion failed #{e.message}"
         e.backtrace.each { |line| elog "#{line}\n" }
       end
@@ -87,7 +68,7 @@ module ResponseDataHelper
       unless File.exists?(save_path) && File.read(save_path) == decoded_file
         File.open(save_path, 'w+') { |file| file.write(decoded_file) }
       end
-    rescue Exception => e
+    rescue => e
       elog "There was an error writing the file: #{e}"
       e.backtrace.each { |line| elog "#{line}\n"}
     end
@@ -147,13 +128,6 @@ module ResponseDataHelper
       end
     end
     obj
-  end
-
-  #
-  # Converts a hash to an open struct
-  #
-  def open_struct(hash)
-    OpenStruct.new(hash)
   end
 
 end

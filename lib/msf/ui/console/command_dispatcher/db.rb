@@ -142,26 +142,76 @@ class Db
 
     if adding and names
       # Add workspaces
-      workspace = nil
+      wspace = nil
       names.each do |name|
-        workspace = framework.db.add_workspace(name)
-        print_status("Added workspace: #{workspace.name}")
+        wspace = framework.db.workspaces(name: name).first
+        if wspace
+          print_status("Workspace '#{wspace.name}' already existed, switching to it.")
+        else
+          wspace = framework.db.add_workspace(name)
+          print_status("Added workspace: #{wspace.name}")
+        end
       end
-      framework.db.workspace = workspace
+      framework.db.workspace = wspace
+      print_status("Workspace: #{framework.db.workspace.name}")
     elsif deleting and names
-      status_msg, error_msg = framework.db.delete_workspaces(names)
-      print_msgs(status_msg, error_msg)
+      ws_ids_to_delete = []
+      starting_ws = framework.db.workspace
+      names.uniq.each do |n|
+        ws = framework.db.workspaces(name: n).first
+        ws_ids_to_delete << ws.id if ws
+      end
+      if ws_ids_to_delete.count > 0
+        deleted = framework.db.delete_workspaces(ids: ws_ids_to_delete)
+        process_deleted_workspaces(deleted, starting_ws)
+      else
+        print_status("No workspaces matching the given name(s) were found.")
+      end
     elsif delete_all
-      status_msg, error_msg = framework.db.delete_all_workspaces()
-      print_msgs(status_msg, error_msg)
+      ws_ids_to_delete = []
+      starting_ws = framework.db.workspace
+      framework.db.workspaces.each do |ws|
+        ws_ids_to_delete << ws.id
+      end
+      deleted = framework.db.delete_workspaces(ids: ws_ids_to_delete)
+      process_deleted_workspaces(deleted, starting_ws)
     elsif renaming
       if names.length != 2
         print_error("Wrong number of arguments to rename")
         return
       end
 
-      old, new = names
-      framework.db.rename_workspace(old, new)
+      ws_to_update = framework.db.find_workspace(names.first)
+      unless ws_to_update
+        print_error("Workspace '#{names.first}' does not exist")
+        return
+      end
+      opts = {
+          id: ws_to_update.id,
+          name: names.last
+      }
+      begin
+        if names.last == Msf::DBManager::Workspace::DEFAULT_WORKSPACE_NAME
+          print_error("Unable to rename a workspace to '#{Msf::DBManager::Workspace::DEFAULT_WORKSPACE_NAME}'")
+          return
+        end
+        updated_ws = framework.db.update_workspace(opts)
+        if updated_ws
+          framework.db.workspace = updated_ws if names.first == framework.db.workspace.name
+          print_status("Renamed workspace '#{names.first}' to '#{updated_ws.name}'")
+        else
+          print_error "There was a problem updating the workspace. Setting to the default workspace."
+          framework.db.workspace = framework.db.default_workspace
+          return
+        end
+        if names.first == Msf::DBManager::Workspace::DEFAULT_WORKSPACE_NAME
+          print_status("Recreated default workspace")
+        end
+      rescue => e
+        print_error "Failed to rename workspace: #{e.message}"
+        e.backtrace.each { |line| print_error "#{line}"}
+      end
+
     elsif names
       name = names.last
       # Switch workspace
@@ -174,12 +224,12 @@ class Db
         return
       end
     else
-      workspace = framework.db.workspace
+      current_workspace = framework.db.workspace
 
       unless verbose
         current = nil
         framework.db.workspaces.sort_by {|s| s.name}.each do |s|
-          if s.name == workspace.name
+          if s.name == current_workspace.name
             current = s.name
           else
             print_line("  #{s.name}")
@@ -188,8 +238,6 @@ class Db
         print_line("%red* #{current}%clr") unless current.nil?
         return
       end
-      workspace = framework.db.workspace
-
       col_names = %w{current name hosts services vulns creds loots notes}
 
       tbl = Rex::Text::Table.new(
@@ -199,22 +247,34 @@ class Db
         'SearchTerm' => search_term
       )
 
-      # List workspaces
-      framework.db.workspace_associations_counts.each do |ws|
+      framework.db.workspaces.each do |ws|
         tbl << [
-          ws[:name] == workspace.name ? '*' : '',
-          ws[:name],
-          ws[:hosts_count],
-          ws[:services_count],
-          ws[:vulns_count],
-          ws[:creds_count],
-          ws[:loots_count],
-          ws[:notes_count]
+          current_workspace.name == ws.name ? '*' : '',
+          ws.name,
+          framework.db.hosts(workspace: ws.name).count,
+          framework.db.services(workspace: ws.name).count,
+          framework.db.vulns(workspace: ws.name).count,
+          framework.db.creds(workspace: ws.name).count,
+          framework.db.loots(workspace: ws.name).count,
+          framework.db.notes(workspace: ws.name).count
         ]
       end
 
       print_line
       print_line(tbl.to_s)
+    end
+  end
+
+  def process_deleted_workspaces(deleted_workspaces, starting_ws)
+    deleted_workspaces.each do |ws|
+      print_status "Deleted workspace: #{ws.name}"
+      if ws.name == Msf::DBManager::Workspace::DEFAULT_WORKSPACE_NAME
+        framework.db.workspace = framework.db.default_workspace
+        print_status 'Recreated the default workspace'
+      elsif ws == starting_ws
+        framework.db.workspace = framework.db.default_workspace
+        print_status "Switched to workspace: #{framework.db.workspace.name}"
+      end
     end
   end
 
@@ -250,7 +310,7 @@ class Db
     each_host_range_chunk(host_ranges) do |host_search|
       break if !host_search.nil? && host_search.empty?
 
-      framework.db.hosts(framework.db.workspace, false, host_search).each do |host|
+      framework.db.hosts(address: host_search).each do |host|
         framework.db.update_host(host_data.merge(id: host.id))
         framework.db.report_note(host: host.address, type: "host.#{attribute}", data: host_data[attribute])
       end
@@ -484,7 +544,7 @@ class Db
     when mode == [:tag]
       begin
         add_host_tag(host_ranges, tag_name)
-      rescue ::Exception => e
+      rescue => e
         if e.message.include?('Validation failed')
           print_error(e.message)
         else
@@ -501,7 +561,7 @@ class Db
     each_host_range_chunk(host_ranges) do |host_search|
       break if !host_search.nil? && host_search.empty?
 
-      framework.db.hosts(framework.db.workspace, onlyup, host_search, search_term = search_term).each do |host|
+      framework.db.hosts(address: host_search, non_dead: onlyup, search_term: search_term).each do |host|
         matched_host_ids << host.id
         columns = col_names.map do |n|
           # Deal with the special cases
@@ -716,9 +776,10 @@ class Db
 
     each_host_range_chunk(host_ranges) do |host_search|
       break if !host_search.nil? && host_search.empty?
-      opts[:addresses] = host_search
+      opts[:workspace] = framework.db.workspace
+      opts[:hosts] = {address: host_search} if !host_search.nil?
       opts[:port] = ports if ports
-      framework.db.services(framework.db.workspace, opts).each do |service|
+      framework.db.services(opts).each do |service|
 
         host = service.host
         matched_service_ids << service.id
@@ -996,7 +1057,7 @@ class Db
         return
       end
 
-      if types && types.size != 1
+      if types.nil? || types.size != 1
         print_error("Exactly one type is required")
         return
       end
@@ -1018,12 +1079,12 @@ class Db
     end
 
     if mode == :update
-      if types && types.size != 1
+      if !types.nil? && types.size != 1
         print_error("Exactly one type is required")
         return
       end
 
-      if !types && !data
+      if types.nil? && data.nil?
         print_error("Update requires data or type")
         return
       end
@@ -1059,18 +1120,18 @@ class Db
       if mode == :update
         begin
           update_opts = {id: note.id}
-          if types
+          unless types.nil?
             note.ntype = types.first
             update_opts[:ntype] = types.first
           end
 
-          if data
+          unless data.nil?
             note.data = data
             update_opts[:data] = data
           end
 
           framework.db.update_note(update_opts)
-        rescue Exception => e
+        rescue => e
           elog "There was an error updating note with ID #{note.id}: #{e.message}"
           next
         end
@@ -1251,12 +1312,12 @@ class Db
     matched_loot_ids = []
     loots = []
     if host_ranges.compact.empty?
-      loots = loots + framework.db.loots(framework.db.workspace, {:search_term => search_term})
+      loots = loots + framework.db.loots(workspace: framework.db.workspace, search_term: search_term)
     else
       each_host_range_chunk(host_ranges) do |host_search|
         break if !host_search.nil? && host_search.empty?
 
-        loots = loots + framework.db.loots(framework.db.workspace, { :hosts => { :address => host_search }, :search_term => search_term })
+        loots = loots + framework.db.loots(workspace: framework.db.workspace, hosts: { address: host_search }, search_term: search_term)
       end
     end
 
@@ -1273,7 +1334,7 @@ class Db
           end
           loot.ltype = types.first if types
           framework.db.update_loot(loot.as_json.symbolize_keys)
-        rescue Exception => e
+        rescue => e
           elog "There was an error updating loot with ID #{loot.id}: #{e.message}"
           next
         end
@@ -1933,15 +1994,18 @@ class Db
     begin
       framework.db.register_data_service(remote_data_service)
       print_line "Registered data service: #{remote_data_service.name}"
-    rescue Exception => e
+      framework.db.workspace = framework.db.default_workspace
+    rescue => e
       print_error "There was a problem registering the remote data service: #{e.message}"
     end
   end
 
   def set_data_service(service_id)
     begin
-      framework.db.set_data_service(service_id)
-    rescue Exception => e
+      data_service = framework.db.set_data_service(service_id)
+      framework.db.workspace = framework.db.default_workspace
+      data_service
+    rescue => e
       print_error "Unable to set data service: #{e.message}"
     end
   end
