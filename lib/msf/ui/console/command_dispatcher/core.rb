@@ -39,6 +39,7 @@ module CommandDispatcher
 class Core
 
   include Msf::Ui::Console::CommandDispatcher
+  include Msf::Ui::Console::CommandDispatcher::Common
 
   # Session command options
   @@sessions_opts = Rex::Parser::Arguments.new(
@@ -697,6 +698,7 @@ class Core
     print_line
     print_line "Loads a plugin from the supplied path."
     print_line "For a list of built-in plugins, do: load -l"
+    print_line "For a list of loaded plugins, do: load -s"
     print_line "The optional var=val options are custom parameters that can be passed to plugins."
     print_line
   end
@@ -767,6 +769,8 @@ class Core
       list_plugins
     when '-h', nil, ''
       cmd_load_help
+    when '-s'
+      framework.plugins.each{ |p| print_line p.name }
     else
       load_plugin(args)
     end
@@ -800,8 +804,8 @@ class Core
     else
       tabs += tab_complete_filenames(str,words)
     end
-    return tabs.map{|e| e.sub(/.rb/, '')}
 
+    return tabs.map{|e| e.sub(/\.rb/, '')} - framework.plugins.map(&:name)
   end
 
   def cmd_route_help
@@ -1571,6 +1575,16 @@ class Core
     name  = args[0]
     value = args[1, args.length-1].join(' ')
 
+    # Set PAYLOAD by index
+    if name.upcase == 'PAYLOAD' && active_module && (active_module.exploit? || active_module.evasion?)
+      index_from_list(payload_show_results, value) do |mod|
+        return false unless mod && mod.respond_to?(:first)
+
+        # [name, class] from payload_show_results
+        value = mod.first
+      end
+    end
+
     # If the driver indicates that the value is not valid, bust out.
     if (driver.on_variable_set(global, name, value) == false)
       print_error("The value specified for #{name} is not valid.")
@@ -1589,11 +1603,15 @@ class Core
     end
 
     # Set PAYLOAD from TARGET
-    if name.upcase == 'TARGET' && active_module && active_module.exploit?
-      active_module.import_target_datastore
+    if name.upcase == 'TARGET' && active_module && (active_module.exploit? || active_module.evasion?)
+      active_module.import_target_defaults
     end
 
     print_line("#{name} => #{datastore[name]}")
+  end
+
+  def payload_show_results
+    Msf::Ui::Console::CommandDispatcher::Modules.class_variable_get(:@@payload_show_results)
   end
 
   #
